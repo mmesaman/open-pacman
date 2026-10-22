@@ -48,13 +48,24 @@ function createGame() {
       kind: g.kind,
       releaseAt: g.releaseAt,
       corner: g.corner,
-      // Fase de salida: 'pen' (contenido en el interior de la pen),
-      // 'exiting' (cruza la puerta), 'out' (ya no puede reentrar).
+      // Fase: 'pen' (dentro de la jaula, quieto), 'out' (en el mapa).
       phase: 'pen',
+      // Celda del mapa donde aparece al liberarse.
+      exit: { ...g.exit },
       target: { x: g.x, y: g.y },
       patrolToCorner: g.kind === 'patrol',
     } ) ),
   };
+}
+
+// Coloca al fantasma directamente en el mapa, en su celda de salida.
+function releaseGhost( game, g ) {
+  g.x = g.exit.x;
+  g.y = g.exit.y;
+  g.dir = 'left';
+  g.phase = 'out';
+  g.target = { x: g.x, y: g.y };
+  g.patrolToCorner = g.kind === 'patrol';
 }
 
 function aligned( v ) {
@@ -66,24 +77,15 @@ function inPen( x, y ) {
   return x >= PEN.x0 && x <= PEN.x1 && y >= PEN.y0 && y <= PEN.y1;
 }
 
-// La celda es una de las dos puertas de la pen (fila 12, cols 13 y 14)?
-function isDoorCell( x, y ) {
-  return y === PEN.y0 - 1 && ( x === 13 || x === 14 );
-}
-
 // Una celda es muro para el actor dado?
 //   pacman: bloqueado por pared (1) y puerta (3)
-//   ghost:  bloqueado por pared (1); la puerta (3) solo se cruza en fase
-//           'exiting', por lo que un fantasma ya salido no puede reentrar.
+//   ghost:  bloqueado por pared (1) y puerta (3); la puerta nunca se cruza.
 function isWall( grid, x, y, actor ) {
   if ( y < 0 || y >= grid.length ) return true;
   if ( x < 0 || x >= grid[ 0 ].length ) return true;
   const v = grid[ y ][ x ];
   if ( v === 1 ) return true;
-  if ( v === 3 ) {
-    if ( actor === 'pacman' ) return true;
-    if ( actor.phase !== 'exiting' ) return true;
-  }
+  if ( v === 3 ) return true;
   return false;
 }
 
@@ -100,20 +102,9 @@ function canMove( grid, x, y, dir, actor ) {
     // Un fantasma contenido en la pen no puede escaparse por el tunel.
     return !isGhost || actor.phase !== 'pen';
   }
-  if ( isGhost ) {
-    if ( actor.phase === 'pen' ) {
-      // Contenido: solo se mueve dentro del interior de la pen.
-      if ( !inPen( tx, ty ) ) return false;
-    } else if ( actor.phase === 'exiting' ) {
-      // Salida: dentro de la pen, por la puerta y hasta el corredor (fila 11).
-      const DOOR_ROW = PEN.y0 - 1;
-      if ( ty < PEN.y0 - 2 ) return false;
-      if ( ty === DOOR_ROW && !isDoorCell( tx, ty ) ) return false;
-      if ( ty > DOOR_ROW && !inPen( tx, ty ) ) return false;
-    } else {
-      // Ya fuera: no puede volver a entrar en la pen por ningun lado.
-      if ( inPen( tx, ty ) ) return false;
-    }
+  if ( isGhost && actor.phase === 'out' ) {
+    // Ya fuera: no puede volver a entrar en la pen por ningun lado.
+    if ( inPen( tx, ty ) ) return false;
   }
   return !isWall( grid, tx, ty, actor );
 }
@@ -153,13 +144,6 @@ function movePacman( game ) {
   p.x += d.x * p.speed;
   p.y += d.y * p.speed;
   wrapTunnel( p, width );
-}
-
-// Celda de la puerta (fila 12) mas cercana en x al fantasma.
-function nearestDoorCell( g ) {
-  const cx = Math.round( g.x );
-  const x = Math.abs( cx - 13 ) <= Math.abs( cx - 14 ) ? 13 : 14;
-  return { x, y: PEN.y0 - 1 };
 }
 
 // Objetivo del fantasma segun su rol:
@@ -219,21 +203,6 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
-  // Contenido en la pen: deambula al azar dentro de su interior.
-  if ( g.phase === 'pen' ) {
-    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
-    return;
-  }
-
-  // Saliendo: se dirige a la puerta mas cercana y de ahi al corredor.
-  if ( g.phase === 'exiting' ) {
-    const door = nearestDoorCell( g );
-    const atDoor = Math.round( g.x ) === door.x && Math.round( g.y ) === door.y;
-    g.target = atDoor ? { x: door.x, y: PEN.y0 - 2 } : door;
-    g.dir = pickToward( choices, g.target, g );
-    return;
-  }
-
   // Fuera de la pen: cada rol decide su objetivo.
   if ( g.kind === 'slow' ) {
     g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
@@ -260,6 +229,9 @@ function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
+  // En la jaula los fantasmas quedan quietos hasta ser liberados.
+  if ( g.phase === 'pen' ) return;
+
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
@@ -279,13 +251,13 @@ function resetPositions( game ) {
   p.y = PACMAN_START.y;
   p.dir = 'left';
   p.nextDir = null;
-  game.ghosts.forEach( ( g, i ) => {
-    g.x = GHOST_STARTS[ i ].x;
-    g.y = GHOST_STARTS[ i ].y;
-    g.dir = 'up';
-    // Tras perder una vida los fantasmas vuelven a la pen. Como dotsEaten
-    // es acumulativo, los que ya cumplieron su releaseAt saldran de inmediato.
-    g.phase = 'pen';
+  game.ghosts.forEach( ( g ) => {
+    // Tras perder una vida los 4 fantasmas vuelven al mapa, cada uno en su
+    // celda de salida de la fila 11, ya liberados.
+    g.x = g.exit.x;
+    g.y = g.exit.y;
+    g.dir = 'left';
+    g.phase = 'out';
     g.target = { x: g.x, y: g.y };
     g.patrolToCorner = g.kind === 'patrol';
   } );
@@ -302,14 +274,10 @@ function update( game ) {
   const dotsEaten = game.dotsInitial - game.dotsRemaining;
 
   game.ghosts.forEach( ( g ) => {
-    // Liberacion escalonada: cada fantasma sale tras certain dots comidos.
-    if ( g.phase === 'pen' && dotsEaten >= g.releaseAt ) g.phase = 'exiting';
+    // Liberacion escalonada: cada fantasma aparece en el mapa (fila 11)
+    // tras ciertos dots comidos.
+    if ( g.phase === 'pen' && dotsEaten >= g.releaseAt ) releaseGhost( game, g );
     moveGhost( game, g );
-    // Al alcanzar el corredor (fila 11) el fantasma queda fuera y ya no
-    // puede reentrar en la pen.
-    if ( g.phase === 'exiting' && Math.round( g.y ) <= PEN.y0 - 2 ) {
-      g.phase = 'out';
-    }
   } );
 
   for ( const g of game.ghosts ) {
