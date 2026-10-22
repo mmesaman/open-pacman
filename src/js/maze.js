@@ -58,11 +58,13 @@ const PACMAN_START = { x: 13, y: 23 };
 //   kind: 'slow'     se mueve al azar, con la menor velocidad
 //   releaseAt: dots comidos por Pac-Man a partir de los cuales puede salir
 //   corner: objetivo de patrulla (solo 'patrol')
+// Las velocidades son 1/n para que el actor aterrice exactamente en el centro
+// de cada celda: el motor de movimiento decide direccion solo al alinear.
 const GHOST_STARTS = [
-  { x: 12, y: 13, kind: 'hunter', speed: 0.11, releaseAt: 0, corner: null }, // fila superior izq.
-  { x: 15, y: 13, kind: 'ambusher', speed: 0.1, releaseAt: 30, corner: null }, // fila superior der.
-  { x: 12, y: 15, kind: 'patrol', speed: 0.09, releaseAt: 60, corner: { x: 1, y: 29 } }, // fila inferior izq.
-  { x: 15, y: 15, kind: 'slow', speed: 0.075, releaseAt: 90, corner: null }, // fila inferior der.
+  { x: 12, y: 13, kind: 'hunter', speed: 1 / 9, releaseAt: 0, corner: null }, // fila superior izq.
+  { x: 15, y: 13, kind: 'ambusher', speed: 1 / 10, releaseAt: 30, corner: null }, // fila superior der.
+  { x: 12, y: 15, kind: 'patrol', speed: 1 / 11, releaseAt: 60, corner: { x: 1, y: 29 } }, // fila inferior izq.
+  { x: 15, y: 15, kind: 'slow', speed: 1 / 13, releaseAt: 90, corner: null }, // fila inferior der.
 ];
 
 window.MAZE = MAZE;

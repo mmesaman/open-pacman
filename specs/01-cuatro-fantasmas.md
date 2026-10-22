@@ -1,6 +1,6 @@
 # SPEC 01 — Cuatro fantasmas con comportamientos distintos
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** —
 > **Date:** 2026-10-22
 > **Objective:** Ampliar el juego de dos a cuatro fantasmas, cada uno con un rol de persecución propio y una salida escalonada desde el pen.
@@ -54,12 +54,19 @@ Valores acordados:
 
 ```js
 const GHOST_STARTS = [
-  { x: 12, y: 13, kind: 'hunter',   speed: 0.11,  releaseAt: 0,  corner: null },
-  { x: 15, y: 13, kind: 'ambusher', speed: 0.10,  releaseAt: 30, corner: null },
-  { x: 12, y: 15, kind: 'patrol',   speed: 0.09,  releaseAt: 60, corner: { x: 1,  y: 29 } },
-  { x: 15, y: 15, kind: 'slow',     speed: 0.075, releaseAt: 90, corner: null },
+  { x: 12, y: 13, kind: 'hunter',   speed: 1 / 9,  releaseAt: 0,  corner: null },
+  { x: 15, y: 13, kind: 'ambusher', speed: 1 / 10, releaseAt: 30, corner: null },
+  { x: 12, y: 15, kind: 'patrol',   speed: 1 / 11, releaseAt: 60, corner: { x: 1,  y: 29 } },
+  { x: 15, y: 15, kind: 'slow',     speed: 1 / 13, releaseAt: 90, corner: null },
 ];
 ```
+
+Las velocidades son **fracciones `1/n`** a propósito. El motor de movimiento (`game.js`) decide dirección,
+come dots y comprueba muros solo cuando el actor queda exactamente alineado con el centro de una celda
+(`aligned()`). Con una velocidad como `0.11` el actor casi nunca alinea, y al no alinear deja de comprobar
+muros: los fantasmas atraviesan paredes. Por eso los valores iniciales del spec (`0.11`, `0.1`, `0.09`, `0.075`)
+quedaron sustituidos por `1/9` (≈0.1111), `1/10` (=0.1), `1/11` (≈0.0909) y `1/13` (≈0.0769): mantienen el orden
+de velocidad acordado (el `hunter` es el más rápido y el `slow` el más lento) y garantizan la alineación en la celda.
 
 Distribución: dos fantasmas en la fila superior del interior del pen (y=13, columnas 12 y 15) y dos en la fila
 inferior (y=15, columnas 12 y 15). Es simétrica respecto al eje vertical del laberinto (cols 13/14).
@@ -153,26 +160,27 @@ Una celda está en el pen si `PEN.x0 <= x <= PEN.x1 && PEN.y0 <= y <= PEN.y1`.
 
 ## Criterios de aceptación
 
-- [ ] El juego muestra **4 fantasmas** desde el primer frame, cada uno con un color distinto.
-- [ ] Los 4 fantasmas empiezan dentro del pen: dos en la fila 13 (cols 12 y 15) y dos en la fila 15 (cols 12 y 15).
-- [ ] Antes de su liberación, un fantasma **no puede salir** del interior del pen (cols 11–16, filas 13–15), aunque
+- [x] El juego muestra **4 fantasmas** desde el primer frame, cada uno con un color distinto.
+- [x] Los 4 fantasmas empiezan dentro del pen: dos en la fila 13 (cols 12 y 15) y dos en la fila 15 (cols 12 y 15).
+- [x] Antes de su liberación, un fantasma **no puede salir** del interior del pen (cols 11–16, filas 13–15), aunque
       el jugador se quede quieto; sí se mueve dentro del pen.
-- [ ] El fantasma `hunter` sale con 0 dots comidos y **persigue directamente** la celda de Pac-Man.
-- [ ] El fantasma `ambusher` no sale hasta 30 dots comidos y su objetivo se sitúa 4 celdas por delante de Pac-Man.
-- [ ] El fantasma `patrol` no sale hasta 60 dots comidos y alterna entre su esquina (1,29) y la celda de Pac-Man.
-- [ ] El fantasma `slow` no sale hasta 90 dots comidos y se mueve al azar.
-- [ ] Las velocidades son 0.11 (hunter), 0.10 (ambusher), 0.09 (patrol) y 0.075 (slow), y son verificables en el juego:
-      el `slow` es visiblemente más lento que el `hunter`.
-- [ ] Ningún fantasma puede volver a entrar en el pen una vez que ha salido.
-- [ ] Los 4 fantasmas no pueden cruzar la puerta del pen mientras están contenidos, ni capturar a Pac-Man dentro
+- [x] El fantasma `hunter` sale con 0 dots comidos y **persigue directamente** la celda de Pac-Man.
+- [x] El fantasma `ambusher` no sale hasta 30 dots comidos y su objetivo se sitúa 4 celdas por delante de Pac-Man.
+- [x] El fantasma `patrol` no sale hasta 60 dots comidos y alterna entre su esquina (1,29) y la celda de Pac-Man.
+- [x] El fantasma `slow` no sale hasta 90 dots comidos y se mueve al azar.
+- [ ] Las velocidades son `1/9` (hunter, ≈0.1111), `1/10` (ambusher, 0.1), `1/11` (patrol, ≈0.0909) y `1/13`
+      (slow, ≈0.0769), y son verificables en el juego: el `slow` es visiblemente más lento que el `hunter`.
+      *(Valores verificados; la perception visual queda pendiente de comprobar en el navegador.)*
+- [x] Ningún fantasma puede volver a entrar en el pen una vez que ha salido.
+- [x] Los 4 fantasmas no pueden cruzar la puerta del pen mientras están contenidos, ni capturar a Pac-Man dentro
       del pen.
-- [ ] Perder una vida reinicia los 4 fantasmas a sus celdas iniciales del pen y mantiene el estado de la partida
+- [x] Perder una vida reinicia los 4 fantasmas a sus celdas iniciales del pen y mantiene el estado de la partida
       (score, dots restantes).
 - [ ] Ganar o perder la partida sigue funcionando igual que antes: overlay con "GANASTE" / "PERDISTE" y botón de
-      reinicio.
+      reinicio. *(Pendiente de comprobar en el navegador.)*
 - [ ] El juego sigue funcionando **sin errores en la consola** al abrir `src/index.html` en el navegador y durante
-      una partida completa.
-- [ ] `AGENTS.md` refleja los cuatro roles y el mecanismo de liberación escalonada.
+      una partida completa. *(Simulado con stubs de canvas/DOM: sin excepciones; falta la comprobacion en navegador.)*
+- [x] `AGENTS.md` refleja los cuatro roles y el mecanismo de liberación escalonada.
 
 ## Decisiones tomadas
 
@@ -181,7 +189,8 @@ Una celda está en el pen si `PEN.x0 <= x <= PEN.x1 && PEN.y0 <= y <= PEN.y1`.
 | Cuatro roles tipo arcade (`hunter`, `ambusher`, `patrol`, `slow`) | Da variedad real en la persecución, como en el original. |
 | Salida escalonada por **dots comidos** (0 / 30 / 60 / 90) | Escala con el ritmo del jugador, no con el reloj; evita que los 4 salgan a la vez y no depende del framerate. |
 | El `hunter` es el único que persigue directamente a Pac-Man | El requisito explícito: "uno de ellos debe perseguir agresivamente". |
-| Velocidades distintas por fantasma | El `slow` (0.075) se puede esquivar de forma distinta al `hunter` (0.11). |
+| Velocidades distintas por fantasma | El `slow` (1/13) se puede esquivar de forma distinta al `hunter` (1/9). |
+| Velocidades expresadas como `1/n` y no como decimales | El motor solo decide dirección y comprueba muros al alinear con el centro de la celda; con `0.11` o `0.09` el actor casi nunca alinea y atraviesa paredes. `1/n` garantiza la alineación conservando el orden de velocidad acordado. |
 | Heurística voraz (Manhattan) mantenida, sin BFS | Reutiliza el código existente; el BFS es un spec aparte si hace falta. |
 | El patrullero alterna entre esquina fija y Pac-Man | Determinista y fácil de verificar contra la esquina acordada. |
 | Los fantasmas no pueden reentrar en el pen | Simplifica el modelo de estados (3 fases) y evita casos raros. |
