@@ -55,10 +55,8 @@ Nuevo carácter en `MAZE_STR` y nuevo valor numérico:
 | `-` | 3 | Puerta del pen |
 | `o` | 4 | Power pellet |
 
-`parseTile()` reconoce `'o'` y devuelve `4`. Las 4 esquinas pasarían de `'.'` a `'o'`:
-
-- Fila 6: `#.####.##.########.##.####.#` → `#.####o##.########.##.####o#`
-- Fila 26: `#......##....##....##......#` → `#o.....##....##....##.....o#`
+`parseTile()` reconoce `'o'` y devuelve `4`. Las 4 esquinas pasan de `'.'` a `'o'` en las columnas 1 y 26 de las
+filas 6 y 26.
 
 `MAZE` sigue siendo la matriz **prístina**: no se muta. `createGame()` copia a `game.grid` y ahí se consumen
 los pellets igual que los dots.
@@ -127,6 +125,10 @@ se pierde una vida, o se come otro power pellet.
 1. **`src/js/maze.js`** — añadir el valor `4` a `parseTile()` (`'o'` → `4`) y cambiar a `'o'` las 4 celdas de las
    esquinas en `MAZE_STR` (filas 6 y 26, columnas 1 y 26). No se toca `MAZE`, `TUNNEL_ROW`, `PACMAN_START` ni la
    puerta. Manual: recargar y comprobar que no hay errores de sintaxis.
+
+   > Nota de implementación: las cadenas resultantes son `'#o####.##.########.##.####o#'` (fila 6) y
+   > `'#o.....##....##....##.....o#'` (fila 26). Las cadenas de ejemplo del apartado "Modelo de datos" estaban
+   > desplazadas un carácter respecto a las columnas 1 y 26; prevalecen las coordenadas.
 2. **`src/js/maze.js`** — añadir `vulnerableSpeed` a las 4 entradas de `GHOST_STARTS` con los valores de la tabla
    anterior. Manual: recargar y verificar que el objeto `GHOST_STARTS` incluye el campo.
 3. **`src/js/game.js` (`createGame`)** — inicializar `game.power = { active: false, framesLeft: 0, streak: 0 }`.

@@ -12,6 +12,11 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 
+// Duracion del efecto vulnerable en frames (~10 s a 60 fps).
+const POWER_FRAMES = 600;
+// Puntos por fantasma vulnerable comido: 200, 400, 800, 1600 (y 1600 tras eso).
+const GHOST_POINTS = [ 200, 400, 800, 1600 ];
+
 // Interior de la pen: columnas 11-16, filas 13-15. La puerta (fila 12,
 // cols 13-14) queda fuera de este rectangulo.
 const PEN = { x0: 11, x1: 16, y0: 13, y1: 15 };
@@ -32,6 +37,12 @@ function createGame() {
     lives: 3,
     dotsRemaining: dots,
     dotsInitial: dots,
+    // Estado del powerup: efecto vulnerable, frames restantes y racha.
+    power: {
+      active: false,
+      framesLeft: 0,
+      streak: 0,
+    },
     grid,
     pacman: {
       x: PACMAN_START.x,
@@ -45,6 +56,10 @@ function createGame() {
       y: g.y,
       dir: 'up',
       speed: g.speed,
+      // Velocidad normal, para restaurarla al terminar el efecto vulnerable.
+      baseSpeed: g.speed,
+      // Velocidad mientras es vulnerable (la mitad de la normal).
+      vulnerableSpeed: g.vulnerableSpeed,
       kind: g.kind,
       releaseAt: g.releaseAt,
       corner: g.corner,
@@ -54,6 +69,9 @@ function createGame() {
       exit: { ...g.exit },
       target: { x: g.x, y: g.y },
       patrolToCorner: g.kind === 'patrol',
+      // Estado de powerup: vulnerable (huye) y eaten (comido, invisible).
+      vulnerable: false,
+      eaten: false,
     } ) ),
   };
 }
@@ -66,6 +84,40 @@ function releaseGhost( game, g ) {
   g.phase = 'out';
   g.target = { x: g.x, y: g.y };
   g.patrolToCorner = g.kind === 'patrol';
+}
+
+// Activa el efecto vulnerable: todos los fantasmas pasan a huir y a moverse
+// a la mitad de velocidad. La racha de puntos se reinicia.
+function activatePower( game ) {
+  game.power.active = true;
+  game.power.streak = 0;
+  game.ghosts.forEach( ( g ) => {
+    g.vulnerable = true;
+    g.eaten = false;
+    g.speed = g.vulnerableSpeed;
+  } );
+}
+
+// Termina el efecto vulnerable: los fantasmas recuperan su comportamiento
+// normal y los que estaban comidos reaparecen en su celda de salida.
+function endPower( game ) {
+  game.power.active = false;
+  game.power.framesLeft = 0;
+  game.power.streak = 0;
+  game.ghosts.forEach( ( g ) => {
+    const wasEaten = g.eaten;
+    g.vulnerable = false;
+    g.eaten = false;
+    g.speed = g.baseSpeed;
+    if ( wasEaten ) {
+      g.x = g.exit.x;
+      g.y = g.exit.y;
+      g.dir = 'left';
+      g.phase = 'out';
+      g.target = { x: g.x, y: g.y };
+      g.patrolToCorner = g.kind === 'patrol';
+    }
+  } );
 }
 
 function aligned( v ) {
@@ -136,6 +188,14 @@ function movePacman( game ) {
       game.score += 10;
       game.dotsRemaining--;
     }
+    // Comer power pellet: activa el efecto vulnerable. Si ya estaba activo,
+    // la cuenta atras NO se reinicia (solo se reinicia la racha).
+    if ( grid[ p.y ][ p.x ] === 4 ) {
+      grid[ p.y ][ p.x ] = 0;
+      game.score += 50;
+      if ( !game.power.active ) game.power.framesLeft = POWER_FRAMES;
+      activatePower( game );
+    }
     // Si no puede seguir, se detiene en la celda.
     if ( !canMove( grid, p.x, p.y, p.dir, 'pacman' ) ) return;
   }
@@ -147,6 +207,7 @@ function movePacman( game ) {
 }
 
 // Objetivo del fantasma segun su rol:
+//   vulnerable: huye de Pac-Man (4 celdas en la direccion opuesta)
 //   hunter:   la celda actual de Pac-Man
 //   ambusher: 4 celdas por delante de Pac-Man (si es muro, la celda de Pac-Man)
 //   patrol:   su esquina o la celda de Pac-Man, alternando
@@ -155,6 +216,20 @@ function ghostTarget( game, g ) {
   const p = game.pacman;
   const px = Math.round( p.x );
   const py = Math.round( p.y );
+
+  // Vulnerable: huir en la direccion contraria a la de Pac-Man. Si la celda
+  // es muro, se usa la celda de Pac-Man como objetivo alternativo.
+  if ( g.vulnerable ) {
+    const d = DIRS[ p.dir ] || { x: 0, y: 0 };
+    const tx = px - d.x * 4;
+    const ty = py - d.y * 4;
+    const grid = game.grid;
+    const outside =
+      tx < 0 || ty < 0 || ty >= grid.length || tx >= grid[ 0 ].length;
+    const v = outside ? 1 : grid[ ty ][ tx ];
+    if ( outside || v === 1 || v === 3 ) return { x: px, y: py };
+    return { x: tx, y: ty };
+  }
 
   if ( g.kind === 'ambusher' ) {
     const d = DIRS[ p.dir ] || { x: 0, y: 0 };
@@ -203,6 +278,13 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
+  // Vulnerable: huir de Pac-Man. Misma heuristica voraz, otro objetivo.
+  if ( g.vulnerable ) {
+    g.target = ghostTarget( game, g );
+    g.dir = pickToward( choices, g.target, g );
+    return;
+  }
+
   // Fuera de la pen: cada rol decide su objetivo.
   if ( g.kind === 'slow' ) {
     g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
@@ -229,6 +311,9 @@ function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
+  // Un fantasma comido no se mueve hasta que termine el efecto.
+  if ( g.eaten ) return;
+
   // En la jaula los fantasmas quedan quietos hasta ser liberados.
   if ( g.phase === 'pen' ) return;
 
@@ -251,6 +336,8 @@ function resetPositions( game ) {
   p.y = PACMAN_START.y;
   p.dir = 'left';
   p.nextDir = null;
+  // Al perder una vida se cancela el efecto vulnerable y la racha.
+  endPower( game );
   game.ghosts.forEach( ( g ) => {
     // Tras perder una vida los 4 fantasmas vuelven al mapa, cada uno en su
     // celda de salida de la fila 11, ya liberados.
@@ -268,6 +355,13 @@ function collides( a, b ) {
 }
 
 function update( game ) {
+  // Cuenta atras del efecto vulnerable. Se decrementa antes de mover a
+  // Pac-Man para que un pellet comido este frame disponga de 600 frames.
+  if ( game.power.active ) {
+    game.power.framesLeft--;
+    if ( game.power.framesLeft <= 0 ) endPower( game );
+  }
+
   movePacman( game );
 
   // Dots comidos en la partida (acumulativo, no baja al perder vidas).
@@ -281,7 +375,17 @@ function update( game ) {
   } );
 
   for ( const g of game.ghosts ) {
+    // Un fantasma comido no colisiona hasta que termine el efecto.
+    if ( g.eaten ) continue;
     if ( collides( game.pacman, g ) ) {
+      // Fantasma vulnerable: Pac-Man se lo come y gana puntos.
+      if ( g.vulnerable ) {
+        g.eaten = true;
+        game.power.streak++;
+        const idx = Math.min( game.power.streak, GHOST_POINTS.length ) - 1;
+        game.score += GHOST_POINTS[ idx ];
+        continue;
+      }
       game.lives--;
       if ( game.lives <= 0 ) {
         game.state = 'lost';
