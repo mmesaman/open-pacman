@@ -11,7 +11,10 @@ const DIRS = {
 const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
-const GHOST_SPEED = 0.1;    // 1/10 celda/frame
+
+// Interior de la pen: columnas 11-16, filas 13-15. La puerta (fila 12,
+// cols 13-14) queda fuera de este rectangulo.
+const PEN = { x0: 11, x1: 16, y0: 13, y1: 15 };
 
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
@@ -28,6 +31,7 @@ function createGame() {
     score: 0,
     lives: 3,
     dotsRemaining: dots,
+    dotsInitial: dots,
     grid,
     pacman: {
       x: PACMAN_START.x,
@@ -40,8 +44,15 @@ function createGame() {
       x: g.x,
       y: g.y,
       dir: 'up',
-      speed: GHOST_SPEED,
+      speed: g.speed,
       kind: g.kind,
+      releaseAt: g.releaseAt,
+      corner: g.corner,
+      // Fase de salida: 'pen' (contenido en el interior de la pen),
+      // 'exiting' (cruza la puerta), 'out' (ya no puede reentrar).
+      phase: 'pen',
+      target: { x: g.x, y: g.y },
+      patrolToCorner: g.kind === 'patrol',
     } ) ),
   };
 }
@@ -168,6 +179,11 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
+    // Tras perder una vida los fantasmas vuelven a la pen. Como dotsEaten
+    // es acumulativo, los que ya cumplieron su releaseAt saldran de inmediato.
+    g.phase = 'pen';
+    g.target = { x: g.x, y: g.y };
+    g.patrolToCorner = g.kind === 'patrol';
   } );
 }
 
