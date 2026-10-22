@@ -27,9 +27,9 @@ un archivo nuevo debe exponer su API por `window.*` y ser añadido explícitamen
 - Coordenadas: celda `(x,y)`, origen arriba-izquierda, x∈[0,27], y∈[0,30]. Simetría vertical entre cols 13 y 14.
 - `TILE = 20` px en render.js; 28*20=560 y 31*20=620 coinciden con el canvas.
 - Constants clave: `TUNNEL_ROW = 14` (fila del túnel, bordes abiertos), `PACMAN_START = {x:13,y:23}`,
-  `GHOST_STARTS` (4 fantasmas: `{x,y,kind,speed,releaseAt,corner}`).
-- La puerta (valor 3) la cruza **solo** un fantasma en fase `exiting`; para Pac-Man y para los fantasmas ya
-  salidos es infranqueable (`isWall(grid,x,y,actor)`).
+  `GHOST_STARTS` (4 fantasmas: `{x,y,kind,speed,releaseAt,corner,exit}`).
+- La puerta (valor 3) es **infranqueable para todos los actores** (Pac-Man y fantasmas, en cualquier fase):
+  `isWall(grid,x,y,actor)` la trata como muro.
 
 ## Reglas de juego (game.js)
 
@@ -43,17 +43,17 @@ un archivo nuevo debe exponer su API por `window.*` y ser añadido explícitamen
   delante; `patrol` alterna entre su `corner` y Pac-Man; `slow` se mueve al azar. La heurística es voraz
   (distancia Manhattan al objetivo); `slow` elige dirección al azar; nunca se elige la dirección inversa salvo
   callejón sin salida.
-- **Fases de salida** (`g.phase`): `'pen'` (contenido en el interior de la pen: cols 11–16, filas 13–15),
-  `'exiting'` (cruza la puerta de la fila 12 y llega al corredor de la fila 11) y `'out'` (ya no puede reentrar).
-  La transición `pen`→`exiting` ocurre cuando `dotsEaten = game.dotsInitial - game.dotsRemaining` alcanza
-  `g.releaseAt` (0 / 30 / 60 / 90 dots); `exiting`→`out` al llegar a la fila 11.
-- `PEN = { x0: 11, x1: 16, y0: 13, y1: 15 }` delimita el interior de la pen; `inPen()` e `isDoorCell()` son los
-  helpers de contención.
+- **Fases de salida** (`g.phase`): solo `'pen'` (dentro de la jaula, **quieto**) y `'out'` (en el mapa).
+  Al cumplirse `dotsEaten = game.dotsInitial - game.dotsRemaining >= g.releaseAt` (0 / 30 / 60 / 90 dots) el
+  fantasma se coloca **directamente en el mapa** en su celda de salida `g.exit` (fila 11: cols 12, 14, 13 y 15),
+  con `dir: 'left'` y `phase: 'out'` (`releaseGhost()`). No hay fase intermedia ni recorrido por la puerta.
+- `PEN = { x0: 11, x1: 16, y0: 13, y1: 15 }` delimita el interior de la pen; `inPen()` es la guarda de contención:
+  un fantasma en fase `'out'` no puede entrar en la pen.
 - Estado del juego: `'start' | 'playing' | 'won' | 'lost'`. `main.js` solo llama `update()` cuando es `'playing'`
   y muestra el overlay al cambiar a `'won'`/`'lost'`.
 - Choque = distancia < 0.5 en ambos ejes; al chocar se pierden una vida y se resetean posiciones (o `'lost'` si lives ≤ 0).
-  Al resetear, los fantasmas vuelven a la pen con `phase: 'pen'`; como `dotsEaten` es acumulativo, los que ya
-  cumplieron su `releaseAt` salen de inmediato.
+  Al resetear, los 4 fantasmas se reponen **en su celda de salida de la fila 11**, en fase `'out'` y con
+  `dir: 'left'` (todos pasan al mapa, incluidos los que aún no habían cumplido su `releaseAt`).
 
 ## Render (render.js)
 

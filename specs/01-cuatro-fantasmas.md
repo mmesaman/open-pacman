@@ -212,3 +212,12 @@ Una celda está en el pen si `PEN.x0 <= x <= PEN.x1 && PEN.y0 <= y <= PEN.y1`.
 - **El pen es simétrico respecto a cols 13/14 y la puerta ocupa 2 celdas.** Un fantasma que sale por la columna 14
   y otro por la 13 se solapan en el mismo frame en `exiting`; definir que en `exiting` la dirección preferida sea la
   celda de puerta más cercana en x.
+
+---
+
+> **Nota (SPEC 02, 2026-10-22):** el mecanismo de salida descrito en este spec (`pen` → `exiting` → `out`, con
+> recorrido por el interior de la pen y cruce de la puerta) **queda sustituido** por el SPEC 02
+> (`specs/02-salida-fantasmas-al-mapa.md`). A partir de ahora el fantasma se coloca **directamente en el mapa**
+> (fila 11) en su celda de salida propia al cumplirse su `releaseAt`, con dirección inicial `'left'`; la fase
+> `'exiting'` se elimina, los fantasmas en fase `'pen'` quedan quietos y la puerta es infranqueable para todos los
+> actores. Se conservan de este spec los roles, las velocidades `1/n` y el calendario escalonado (0 / 30 / 60 / 90).
