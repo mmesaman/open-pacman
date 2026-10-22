@@ -51,9 +51,18 @@ const MAZE = MAZE_STR.map( ( row ) => row.split( '' ).map( parseTile ) );
 
 const TUNNEL_ROW = 14;
 const PACMAN_START = { x: 13, y: 23 };
+// Cuatro fantasmas, cada uno con rol, velocidad y momento de salida propios.
+//   kind: 'hunter'   persigue la celda de Pac-Man
+//   kind: 'ambusher' apunta 4 celdas por delante de Pac-Man
+//   kind: 'patrol'   alterna entre su esquina y la celda de Pac-Man
+//   kind: 'slow'     se mueve al azar, con la menor velocidad
+//   releaseAt: dots comidos por Pac-Man a partir de los cuales puede salir
+//   corner: objetivo de patrulla (solo 'patrol')
 const GHOST_STARTS = [
-  { x: 13, y: 14, kind: 'hunter' }, // dentro de la pen
-  { x: 14, y: 14, kind: 'random' }, // dentro de la pen
+  { x: 12, y: 13, kind: 'hunter', speed: 0.11, releaseAt: 0, corner: null }, // fila superior izq.
+  { x: 15, y: 13, kind: 'ambusher', speed: 0.1, releaseAt: 30, corner: null }, // fila superior der.
+  { x: 12, y: 15, kind: 'patrol', speed: 0.09, releaseAt: 60, corner: { x: 1, y: 29 } }, // fila inferior izq.
+  { x: 15, y: 15, kind: 'slow', speed: 0.075, releaseAt: 90, corner: null }, // fila inferior der.
 ];
 
 window.MAZE = MAZE;
