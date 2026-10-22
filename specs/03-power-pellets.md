@@ -1,6 +1,6 @@
 # SPEC 03 — Power pellets y fantasmas vulnerables
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01, SPEC 02
 > **Date:** 2026-10-22
 > **Objective:** Añadir 4 power pellets al laberinto que, al ser comidos, vuelve vulnerables a los fantasmas durante 600 frames para que Pac-Man pueda comerlos.
